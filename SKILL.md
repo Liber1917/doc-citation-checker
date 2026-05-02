@@ -54,7 +54,8 @@ Optional arguments:
 - `--file <path>` - Single file to check
 - `--dir <path>` - Directory to scan for documents
 - `--output <path>` - Save report to JSON file
-- `--threshold <float>` - Similarity threshold (default: 0.85)
+- `--threshold <float>` - Jaccard similarity threshold (default: 0.60; higher = stricter)
+- `--verbose` - Print debug info (API candidates, similarity scores, title extraction)
 
 ### Step 3: Interpret Results
 
@@ -104,18 +105,35 @@ The script generates a JSON report:
 }
 ```
 
-## Common Issues
+## Common Issues & Error Handling
 
 ### No citations found
 - Check if the document has a bibliography section
 - Verify citations are in a recognizable format
 - Try manually copying citations to a .txt file
 
-### API rate limits
-- The script includes delays between API calls
-- For large documents, use `--output` to save progress
-- Consider running overnight for 50+ citations
+### API rate limits / network errors
+- The script has automatic retry (3 attempts with backoff) for all API calls
+- Each request has a 15-second timeout
+- If all APIs fail for a citation, it's marked `unverifiable`
 
-### False positives
-- Some legitimate citations may not be in databases (preprints, non-English, very recent)
-- Manually verify suspicious results before concluding hallucination
+### False positives (real paper marked hallucinated)
+- Lower the threshold: `--threshold 0.4`
+- Use `--verbose` to see similarity scores and API candidates
+- Some legitimate papers may not be in CrossRef/Semantic Scholar (preprints, non-English, very recent)
+
+### False negatives (fake paper marked valid)
+- Raise the threshold: `--threshold 0.8`
+- Check `--verbose` output: are API candidates truly matching?
+- The Jaccard similarity requires ≥2 overlapping words; short titles need exact match
+
+### Encoding errors reading .tex / .txt
+- Script auto-tries utf-8 → gbk → gb2312 → latin-1 → utf-8(replace)
+- If all fail, the file is skipped with an error message
+
+### Dependency missing
+```bash
+pip install requests urllib3 python-docx
+```
+- `requests` + `urllib3`: required (API calls + retry logic)
+- `python-docx`: only needed for .docx files
